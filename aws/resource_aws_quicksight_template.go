@@ -19,10 +19,6 @@ func resourceAwsQuickSightTemplate() *schema.Resource {
 		Update: resourceAwsQuickSightTemplateUpdate,
 		Delete: resourceAwsQuickSightTemplateDelete,
 
-		Importer: &schema.ResourceImporter{
-			State: schema.ImportStatePassthrough,
-		},
-
 		Schema: map[string]*schema.Schema{
 			"arn": {
 				Type:     schema.TypeString,
@@ -221,32 +217,30 @@ func resourceAwsQuickSightTemplateCreate(d *schema.ResourceData, meta interface{
 func resourceAwsQuickSightTemplateRead(d *schema.ResourceData, meta interface{}) error {
 	conn := meta.(*AWSClient).quicksightconn
 
-	awsAccountId, templateId, err := resourceAwsQuickSightGroupParseID(d.Id())
+	awsAccountId, templateId, err := resourceAwsQuickSightTemplateParseID(d.Id())
 	if err != nil {
 		return err
 	}
 
-	descOpts := &quicksight.DescribeGroupInput{
+	descOpts := &quicksight.DescribeTemplateInput{
 		AwsAccountId: aws.String(awsAccountId),
-		Namespace:    aws.String(namespace),
-		GroupName:    aws.String(groupName),
+		TemplateId:   aws.String(templateId),
 	}
 
-	resp, err := conn.DescribeGroup(descOpts)
+	resp, err := conn.DescribeTemplate(descOpts)
 	if isAWSErr(err, quicksight.ErrCodeResourceNotFoundException, "") {
-		log.Printf("[WARN] QuickSight Group %s is already gone", d.Id())
+		log.Printf("[WARN] QuickSight Template %s is already gone", d.Id())
 		d.SetId("")
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("Error describing QuickSight Group (%s): %s", d.Id(), err)
+		return fmt.Errorf("Error describing QuickSight Template (%s): %s", d.Id(), err)
 	}
 
-	d.Set("arn", resp.Group.Arn)
+	d.Set("arn", resp.Template.Arn)
 	d.Set("aws_account_id", awsAccountId)
-	d.Set("group_name", resp.Group.GroupName)
-	d.Set("description", resp.Group.Description)
-	d.Set("namespace", namespace)
+	d.Set("name", resp.Template.Name)
+	d.Set("template_id", resp.Template.TemplateId)
 
 	return nil
 }
@@ -331,10 +325,10 @@ func resourceAwsQuickSightGetSourceEntity(sourceEntity map[string]interface{}, k
 	return aws.String(""), nil, false
 }
 
-func resourceAwsQuickSightTemplateParseID(id string) (string, string, string, error) {
-	parts := strings.SplitN(id, "/", 3)
-	if len(parts) < 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
-		return "", "", "", fmt.Errorf("unexpected format of ID (%s), expected AWS_ACCOUNT_ID/NAMESPACE/GROUP_NAME", id)
+func resourceAwsQuickSightTemplateParseID(id string) (string, string, error) {
+	parts := strings.SplitN(id, "/", 2)
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", fmt.Errorf("unexpected format of ID (%s), expected AWS_ACCOUNT_ID/TEMPLATE_ID", id)
 	}
-	return parts[0], parts[1], parts[2], nil
+	return parts[0], parts[1], nil
 }
