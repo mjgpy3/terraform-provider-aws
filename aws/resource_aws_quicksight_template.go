@@ -36,6 +36,11 @@ func resourceAwsQuickSightTemplate() *schema.Resource {
 				ForceNew: true,
 			},
 
+			"version_arn": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+
 			"name": {
 				Type:         schema.TypeString,
 				Optional:     true,
@@ -81,6 +86,24 @@ func resourceAwsQuickSightTemplate() *schema.Resource {
 										Required:     true,
 										ValidateFunc: validateArn,
 									},
+									"data_set_references": {
+										Type:     schema.TypeList,
+										Optional: true,
+										MaxItems: 1,
+										Elem: &schema.Resource{
+											Schema: map[string]*schema.Schema{
+												"arn": {
+													Type:         schema.TypeString,
+													Required:     true,
+													ValidateFunc: validateArn,
+												},
+												"placeholder": {
+													Type:     schema.TypeString,
+													Required: true,
+												},
+											},
+										},
+									},
 								},
 							},
 						},
@@ -107,6 +130,7 @@ func resourceAwsQuickSightTemplate() *schema.Resource {
 			"template_id": {
 				Type:         schema.TypeString,
 				Required:     true,
+				ForceNew: true,
 				ValidateFunc: validation.NoZeroValues,
 			},
 
@@ -122,43 +146,88 @@ func resourceAwsQuickSightTemplate() *schema.Resource {
 func resourceAwsQuickSightTemplateCreate(d *schema.ResourceData, meta interface{}) error {
 	conn := meta.(*AWSClient).quicksightconn
 
-	awsAccountID := meta.(*AWSClient).accountid
-	namespace := d.Get("namespace").(string)
+	awsAccountId := meta.(*AWSClient).accountid
 
 	if v, ok := d.GetOk("aws_account_id"); ok {
-		awsAccountID = v.(string)
+		awsAccountId = v.(string)
 	}
 
-	createOpts := &quicksight.CreateGroupInput{
-		AwsAccountId: aws.String(awsAccountID),
-		Namespace:    aws.String(namespace),
-		GroupName:    aws.String(d.Get("group_name").(string)),
+	createOpts := &quicksight.CreateTemplateInput{
+		AwsAccountId: aws.String(awsAccountId),
+                TemplateId: aws.String(v.Get("template_id").(string)),
 	}
 
-	if v, ok := d.GetOk("description"); ok {
-		createOpts.Description = aws.String(v.(string))
+	if name, ok := d.GetOk("name"); ok {
+		createOpts.Name = aws.String(name)
 	}
 
-	resp, err := conn.CreateGroup(createOpts)
+	if versionDescription, ok := d.GetOk("version_description"); ok {
+		createOpts.VersionDescription = aws.String(version_description)
+	}
+
+	if v := d.Get("permission"); v != nil && len(v.([]interface{})) != 0 {
+		createOpts.Permissions = make([]*quicksight.ResourcePermission, 0)
+
+		for _, v := range v.([]interface{}) {
+			permissionResource := v.(map[string]interface{})
+			permission := &quicksight.ResourcePermission{
+				Actions:   expandStringSet(permissionResource["actions"].(*schema.Set)),
+				Principal: aws.String(permissionResource["principal"].(string)),
+			}
+
+			createOpts.Permissions = append(params.Permissions, permission)
+		}
+	}
+
+	if v := d.Get("source_entity"); v != nil {
+		for _, v := range v.([]interface{}) {
+			sourceEntity := v.(map[string]interface{})
+
+			if arn, dataSetReferences, found := resourceAwsQuickSightGetSourceEntity(sourceEntity, "source_analysis"); found {
+				createOpts.SourceEntity = &quicksight.TemplateSourceEntity{
+					SourceAnalysis: &quicksight.TemplateSourceAnalysis{
+						Arn:               arn,
+						DataSetReferences: dataSetReferences,
+					},
+				}
+			}
+
+			if arn, dataSetReferences, found := resourceAwsQuickSightGetSourceEntity(sourceEntity, "source_template"); found {
+				createOpts.SourceEntity = &quicksight.TemplateSourceEntity{
+					SourceTemplate: &quicksight.TemplateSourceTemplate{
+						Arn:               arn,
+						DataSetReferences: dataSetReferences,
+					},
+				}
+			}
+
+		}
+	}
+
+	if v, ok := d.GetOk("tags"); ok {
+		params.Tags = tagsFromMapQuickSight(v.(map[string]interface{}))
+	}
+
+	resp, err := conn.CreateTemplate(createOpts)
 	if err != nil {
-		return fmt.Errorf("Error creating QuickSight Group: %s", err)
+		return fmt.Errorf("Error creating QuickSight Template: %s", err)
 	}
 
-	d.SetId(fmt.Sprintf("%s/%s/%s", awsAccountID, namespace, aws.StringValue(resp.Group.GroupName)))
+	d.SetId(fmt.Sprintf("%s/%s", awsAccountId, aws.StringValue(resp.TemplateId)))
 
-	return resourceAwsQuickSightGroupRead(d, meta)
+	return resourceAwsQuickSightTemplateRead(d, meta)
 }
 
-func resourceAwsQuickSightGroupRead(d *schema.ResourceData, meta interface{}) error {
+func resourceAwsQuickSightTemplateRead(d *schema.ResourceData, meta interface{}) error {
 	conn := meta.(*AWSClient).quicksightconn
 
-	awsAccountID, namespace, groupName, err := resourceAwsQuickSightGroupParseID(d.Id())
+	awsAccountId, templateId, err := resourceAwsQuickSightGroupParseID(d.Id())
 	if err != nil {
 		return err
 	}
 
 	descOpts := &quicksight.DescribeGroupInput{
-		AwsAccountId: aws.String(awsAccountID),
+		AwsAccountId: aws.String(awsAccountId),
 		Namespace:    aws.String(namespace),
 		GroupName:    aws.String(groupName),
 	}
@@ -174,7 +243,7 @@ func resourceAwsQuickSightGroupRead(d *schema.ResourceData, meta interface{}) er
 	}
 
 	d.Set("arn", resp.Group.Arn)
-	d.Set("aws_account_id", awsAccountID)
+	d.Set("aws_account_id", awsAccountId)
 	d.Set("group_name", resp.Group.GroupName)
 	d.Set("description", resp.Group.Description)
 	d.Set("namespace", namespace)
@@ -185,13 +254,13 @@ func resourceAwsQuickSightGroupRead(d *schema.ResourceData, meta interface{}) er
 func resourceAwsQuickSightGroupUpdate(d *schema.ResourceData, meta interface{}) error {
 	conn := meta.(*AWSClient).quicksightconn
 
-	awsAccountID, namespace, groupName, err := resourceAwsQuickSightGroupParseID(d.Id())
+	awsAccountId, namespace, groupName, err := resourceAwsQuickSightGroupParseID(d.Id())
 	if err != nil {
 		return err
 	}
 
 	updateOpts := &quicksight.UpdateGroupInput{
-		AwsAccountId: aws.String(awsAccountID),
+		AwsAccountId: aws.String(awsAccountId),
 		Namespace:    aws.String(namespace),
 		GroupName:    aws.String(groupName),
 	}
@@ -216,13 +285,13 @@ func resourceAwsQuickSightGroupUpdate(d *schema.ResourceData, meta interface{}) 
 func resourceAwsQuickSightGroupDelete(d *schema.ResourceData, meta interface{}) error {
 	conn := meta.(*AWSClient).quicksightconn
 
-	awsAccountID, namespace, groupName, err := resourceAwsQuickSightGroupParseID(d.Id())
+	awsAccountId, namespace, groupName, err := resourceAwsQuickSightTemplateParseID(d.Id())
 	if err != nil {
 		return err
 	}
 
 	deleteOpts := &quicksight.DeleteGroupInput{
-		AwsAccountId: aws.String(awsAccountID),
+		AwsAccountId: aws.String(awsAccountId),
 		Namespace:    aws.String(namespace),
 		GroupName:    aws.String(groupName),
 	}
@@ -237,7 +306,32 @@ func resourceAwsQuickSightGroupDelete(d *schema.ResourceData, meta interface{}) 
 	return nil
 }
 
-func resourceAwsQuickSightGroupParseID(id string) (string, string, string, error) {
+func resourceAwsQuickSightGetSourceEntity(sourceEntity map[string]interface{}, keyToTry string) (*string, []*quicksight.DataSetReferences, bool) {
+	if v := sourceEntity[keyToTry]; v != nil && v.([]interface{}) != nil {
+		dataSetReferences := make([]*quicksight.DataSetReference, 0)
+		var arn *string
+
+		for _, v := range v.([]interface{}) {
+			entity := v.(map[string]interface{})
+			arn = aws.String(entity["arn"].(string))
+
+			for _, v := range entity["data_set_references"].([]interface{}).List() {
+				dataSetRef := v.(map[string]interface{})
+
+				dataSetReferences = append(dataSetReferences, &quicksight.DataSetReference{
+					DataSetArn:         aws.String(dataSetRef["arn"].(string)),
+					DataSetPlaceholder: aws.String(dataSetRef["placeholder"].(string)),
+				})
+			}
+		}
+
+		return arn, dataSetReferences, true
+	}
+
+	return aws.String(""), nil, false
+}
+
+func resourceAwsQuickSightTemplateParseID(id string) (string, string, string, error) {
 	parts := strings.SplitN(id, "/", 3)
 	if len(parts) < 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
 		return "", "", "", fmt.Errorf("unexpected format of ID (%s), expected AWS_ACCOUNT_ID/NAMESPACE/GROUP_NAME", id)
