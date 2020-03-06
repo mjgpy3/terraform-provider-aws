@@ -25,7 +25,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/devicefarm"
 	"github.com/aws/aws-sdk-go/service/directconnect"
 	"github.com/aws/aws-sdk-go/service/directoryservice"
-	"github.com/aws/aws-sdk-go/service/dlm"
 	"github.com/aws/aws-sdk-go/service/docdb"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -41,6 +40,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/firehose"
 	"github.com/aws/aws-sdk-go/service/fms"
 	"github.com/aws/aws-sdk-go/service/fsx"
+	"github.com/aws/aws-sdk-go/service/gamelift"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/inspector"
 	"github.com/aws/aws-sdk-go/service/iot"
@@ -55,6 +55,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/mediastore"
 	"github.com/aws/aws-sdk-go/service/neptune"
 	"github.com/aws/aws-sdk-go/service/organizations"
+	"github.com/aws/aws-sdk-go/service/quicksight"
 	"github.com/aws/aws-sdk-go/service/ram"
 	"github.com/aws/aws-sdk-go/service/rds"
 	"github.com/aws/aws-sdk-go/service/redshift"
@@ -72,10 +73,21 @@ import (
 	"github.com/aws/aws-sdk-go/service/swf"
 	"github.com/aws/aws-sdk-go/service/transfer"
 	"github.com/aws/aws-sdk-go/service/waf"
+	"github.com/aws/aws-sdk-go/service/wafv2"
 	"github.com/aws/aws-sdk-go/service/workspaces"
 )
 
 // map[string]*string handling
+
+// AccessanalyzerTags returns accessanalyzer service tags.
+func (tags KeyValueTags) AccessanalyzerTags() map[string]*string {
+	return aws.StringMap(tags.Map())
+}
+
+// AccessanalyzerKeyValueTags creates KeyValueTags from accessanalyzer service tags.
+func AccessanalyzerKeyValueTags(tags map[string]*string) KeyValueTags {
+	return New(tags)
+}
 
 // AmplifyTags returns amplify service tags.
 func (tags KeyValueTags) AmplifyTags() map[string]*string {
@@ -167,6 +179,16 @@ func CodecommitKeyValueTags(tags map[string]*string) KeyValueTags {
 	return New(tags)
 }
 
+// CodestarnotificationsTags returns codestarnotifications service tags.
+func (tags KeyValueTags) CodestarnotificationsTags() map[string]*string {
+	return aws.StringMap(tags.Map())
+}
+
+// CodestarnotificationsKeyValueTags creates KeyValueTags from codestarnotifications service tags.
+func CodestarnotificationsKeyValueTags(tags map[string]*string) KeyValueTags {
+	return New(tags)
+}
+
 // CognitoidentityTags returns cognitoidentity service tags.
 func (tags KeyValueTags) CognitoidentityTags() map[string]*string {
 	return aws.StringMap(tags.Map())
@@ -184,6 +206,26 @@ func (tags KeyValueTags) CognitoidentityproviderTags() map[string]*string {
 
 // CognitoidentityproviderKeyValueTags creates KeyValueTags from cognitoidentityprovider service tags.
 func CognitoidentityproviderKeyValueTags(tags map[string]*string) KeyValueTags {
+	return New(tags)
+}
+
+// DataexchangeTags returns dataexchange service tags.
+func (tags KeyValueTags) DataexchangeTags() map[string]*string {
+	return aws.StringMap(tags.Map())
+}
+
+// DataexchangeKeyValueTags creates KeyValueTags from dataexchange service tags.
+func DataexchangeKeyValueTags(tags map[string]*string) KeyValueTags {
+	return New(tags)
+}
+
+// DlmTags returns dlm service tags.
+func (tags KeyValueTags) DlmTags() map[string]*string {
+	return aws.StringMap(tags.Map())
+}
+
+// DlmKeyValueTags creates KeyValueTags from dlm service tags.
+func DlmKeyValueTags(tags map[string]*string) KeyValueTags {
 	return New(tags)
 }
 
@@ -217,6 +259,16 @@ func GlueKeyValueTags(tags map[string]*string) KeyValueTags {
 	return New(tags)
 }
 
+// GreengrassTags returns greengrass service tags.
+func (tags KeyValueTags) GreengrassTags() map[string]*string {
+	return aws.StringMap(tags.Map())
+}
+
+// GreengrassKeyValueTags creates KeyValueTags from greengrass service tags.
+func GreengrassKeyValueTags(tags map[string]*string) KeyValueTags {
+	return New(tags)
+}
+
 // GuarddutyTags returns guardduty service tags.
 func (tags KeyValueTags) GuarddutyTags() map[string]*string {
 	return aws.StringMap(tags.Map())
@@ -224,6 +276,16 @@ func (tags KeyValueTags) GuarddutyTags() map[string]*string {
 
 // GuarddutyKeyValueTags creates KeyValueTags from guardduty service tags.
 func GuarddutyKeyValueTags(tags map[string]*string) KeyValueTags {
+	return New(tags)
+}
+
+// ImagebuilderTags returns imagebuilder service tags.
+func (tags KeyValueTags) ImagebuilderTags() map[string]*string {
+	return aws.StringMap(tags.Map())
+}
+
+// ImagebuilderKeyValueTags creates KeyValueTags from imagebuilder service tags.
+func ImagebuilderKeyValueTags(tags map[string]*string) KeyValueTags {
 	return New(tags)
 }
 
@@ -314,6 +376,16 @@ func (tags KeyValueTags) PinpointTags() map[string]*string {
 
 // PinpointKeyValueTags creates KeyValueTags from pinpoint service tags.
 func PinpointKeyValueTags(tags map[string]*string) KeyValueTags {
+	return New(tags)
+}
+
+// QldbTags returns qldb service tags.
+func (tags KeyValueTags) QldbTags() map[string]*string {
+	return aws.StringMap(tags.Map())
+}
+
+// QldbKeyValueTags creates KeyValueTags from qldb service tags.
+func QldbKeyValueTags(tags map[string]*string) KeyValueTags {
 	return New(tags)
 }
 
@@ -916,33 +988,6 @@ func DirectoryserviceKeyValueTags(tags []*directoryservice.Tag) KeyValueTags {
 	return New(m)
 }
 
-// DlmTags returns dlm service tags.
-func (tags KeyValueTags) DlmTags() []*dlm.Tag {
-	result := make([]*dlm.Tag, 0, len(tags))
-
-	for k, v := range tags.Map() {
-		tag := &dlm.Tag{
-			Key:   aws.String(k),
-			Value: aws.String(v),
-		}
-
-		result = append(result, tag)
-	}
-
-	return result
-}
-
-// DlmKeyValueTags creates KeyValueTags from dlm service tags.
-func DlmKeyValueTags(tags []*dlm.Tag) KeyValueTags {
-	m := make(map[string]*string, len(tags))
-
-	for _, tag := range tags {
-		m[aws.StringValue(tag.Key)] = tag.Value
-	}
-
-	return New(m)
-}
-
 // DocdbTags returns docdb service tags.
 func (tags KeyValueTags) DocdbTags() []*docdb.Tag {
 	result := make([]*docdb.Tag, 0, len(tags))
@@ -1186,6 +1231,21 @@ func ElasticsearchserviceKeyValueTags(tags []*elasticsearchservice.Tag) KeyValue
 	return New(m)
 }
 
+// ElbTagKeys returns elb service tag keys.
+func (tags KeyValueTags) ElbTagKeys() []*elb.TagKeyOnly {
+	result := make([]*elb.TagKeyOnly, 0, len(tags))
+
+	for k := range tags.Map() {
+		tagKey := &elb.TagKeyOnly{
+			Key: aws.String(k),
+		}
+
+		result = append(result, tagKey)
+	}
+
+	return result
+}
+
 // ElbTags returns elb service tags.
 func (tags KeyValueTags) ElbTags() []*elb.Tag {
 	result := make([]*elb.Tag, 0, len(tags))
@@ -1339,6 +1399,33 @@ func (tags KeyValueTags) FsxTags() []*fsx.Tag {
 
 // FsxKeyValueTags creates KeyValueTags from fsx service tags.
 func FsxKeyValueTags(tags []*fsx.Tag) KeyValueTags {
+	m := make(map[string]*string, len(tags))
+
+	for _, tag := range tags {
+		m[aws.StringValue(tag.Key)] = tag.Value
+	}
+
+	return New(m)
+}
+
+// GameliftTags returns gamelift service tags.
+func (tags KeyValueTags) GameliftTags() []*gamelift.Tag {
+	result := make([]*gamelift.Tag, 0, len(tags))
+
+	for k, v := range tags.Map() {
+		tag := &gamelift.Tag{
+			Key:   aws.String(k),
+			Value: aws.String(v),
+		}
+
+		result = append(result, tag)
+	}
+
+	return result
+}
+
+// GameliftKeyValueTags creates KeyValueTags from gamelift service tags.
+func GameliftKeyValueTags(tags []*gamelift.Tag) KeyValueTags {
 	m := make(map[string]*string, len(tags))
 
 	for _, tag := range tags {
@@ -1717,6 +1804,33 @@ func (tags KeyValueTags) OrganizationsTags() []*organizations.Tag {
 
 // OrganizationsKeyValueTags creates KeyValueTags from organizations service tags.
 func OrganizationsKeyValueTags(tags []*organizations.Tag) KeyValueTags {
+	m := make(map[string]*string, len(tags))
+
+	for _, tag := range tags {
+		m[aws.StringValue(tag.Key)] = tag.Value
+	}
+
+	return New(m)
+}
+
+// QuicksightTags returns quicksight service tags.
+func (tags KeyValueTags) QuicksightTags() []*quicksight.Tag {
+	result := make([]*quicksight.Tag, 0, len(tags))
+
+	for k, v := range tags.Map() {
+		tag := &quicksight.Tag{
+			Key:   aws.String(k),
+			Value: aws.String(v),
+		}
+
+		result = append(result, tag)
+	}
+
+	return result
+}
+
+// QuicksightKeyValueTags creates KeyValueTags from quicksight service tags.
+func QuicksightKeyValueTags(tags []*quicksight.Tag) KeyValueTags {
 	m := make(map[string]*string, len(tags))
 
 	for _, tag := range tags {
@@ -2176,6 +2290,60 @@ func (tags KeyValueTags) WafTags() []*waf.Tag {
 
 // WafKeyValueTags creates KeyValueTags from waf service tags.
 func WafKeyValueTags(tags []*waf.Tag) KeyValueTags {
+	m := make(map[string]*string, len(tags))
+
+	for _, tag := range tags {
+		m[aws.StringValue(tag.Key)] = tag.Value
+	}
+
+	return New(m)
+}
+
+// WafregionalTags returns wafregional service tags.
+func (tags KeyValueTags) WafregionalTags() []*waf.Tag {
+	result := make([]*waf.Tag, 0, len(tags))
+
+	for k, v := range tags.Map() {
+		tag := &waf.Tag{
+			Key:   aws.String(k),
+			Value: aws.String(v),
+		}
+
+		result = append(result, tag)
+	}
+
+	return result
+}
+
+// WafregionalKeyValueTags creates KeyValueTags from wafregional service tags.
+func WafregionalKeyValueTags(tags []*waf.Tag) KeyValueTags {
+	m := make(map[string]*string, len(tags))
+
+	for _, tag := range tags {
+		m[aws.StringValue(tag.Key)] = tag.Value
+	}
+
+	return New(m)
+}
+
+// Wafv2Tags returns wafv2 service tags.
+func (tags KeyValueTags) Wafv2Tags() []*wafv2.Tag {
+	result := make([]*wafv2.Tag, 0, len(tags))
+
+	for k, v := range tags.Map() {
+		tag := &wafv2.Tag{
+			Key:   aws.String(k),
+			Value: aws.String(v),
+		}
+
+		result = append(result, tag)
+	}
+
+	return result
+}
+
+// Wafv2KeyValueTags creates KeyValueTags from wafv2 service tags.
+func Wafv2KeyValueTags(tags []*wafv2.Tag) KeyValueTags {
 	m := make(map[string]*string, len(tags))
 
 	for _, tag := range tags {

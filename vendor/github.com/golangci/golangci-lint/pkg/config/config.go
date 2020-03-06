@@ -116,9 +116,13 @@ type Run struct {
 
 	ExitCodeIfIssuesFound int  `mapstructure:"issues-exit-code"`
 	AnalyzeTests          bool `mapstructure:"tests"`
-	Deadline              time.Duration
-	PrintVersion          bool
 
+	// Deprecated: Deadline exists for historical compatibility
+	// and should not be used. To set run timeout use Timeout instead.
+	Deadline time.Duration
+	Timeout  time.Duration
+
+	PrintVersion       bool
 	SkipFiles          []string `mapstructure:"skip-files"`
 	SkipDirs           []string `mapstructure:"skip-dirs"`
 	UseDefaultSkipDirs bool     `mapstructure:"skip-dirs-use-default"`
@@ -154,6 +158,9 @@ type LintersSettings struct {
 		MinStringLen        int `mapstructure:"min-len"`
 		MinOccurrencesCount int `mapstructure:"min-occurrences"`
 	}
+	Gomnd struct {
+		Settings map[string]map[string]interface{}
+	}
 	Depguard struct {
 		ListType                 string `mapstructure:"list-type"`
 		Packages                 []string
@@ -172,9 +179,14 @@ type LintersSettings struct {
 		Statements int
 	}
 	Whitespace struct {
-		MultiIf bool `mapstructure:"multi-if"`
+		MultiIf   bool `mapstructure:"multi-if"`
+		MultiFunc bool `mapstructure:"multi-func"`
+	}
+	RowsErrCheck struct {
+		Packages []string
 	}
 
+	WSL      WSLSettings
 	Lll      LllSettings
 	Unparam  UnparamSettings
 	Nakedret NakedretSettings
@@ -183,6 +195,9 @@ type LintersSettings struct {
 	Gocritic GocriticSettings
 	Godox    GodoxSettings
 	Dogsled  DogsledSettings
+	Gocognit GocognitSettings
+
+	Custom map[string]CustomLinterSettings
 }
 
 type GovetSettings struct {
@@ -243,6 +258,20 @@ type DogsledSettings struct {
 	MaxBlankIdentifiers int `mapstructure:"max-blank-identifiers"`
 }
 
+type GocognitSettings struct {
+	MinComplexity int `mapstructure:"min-complexity"`
+}
+
+type WSLSettings struct {
+	StrictAppend                     bool `mapstructure:"strict-append"`
+	AllowAssignAndCallCuddle         bool `mapstructure:"allow-assign-and-call"`
+	AllowMultiLineAssignCuddle       bool `mapstructure:"allow-multiline-assign"`
+	AllowCuddleDeclaration           bool `mapstructure:"allow-cuddle-declarations"`
+	AllowTrailingComment             bool `mapstructure:"allow-trailing-comment"`
+	CaseForceTrailingWhitespaceLimit int  `mapstructure:"force-case-trailing-whitespace:"`
+}
+
+//nolint:gomnd
 var defaultLintersSettings = LintersSettings{
 	Lll: LllSettings{
 		LineLength: 120,
@@ -268,6 +297,23 @@ var defaultLintersSettings = LintersSettings{
 	Dogsled: DogsledSettings{
 		MaxBlankIdentifiers: 2,
 	},
+	Gocognit: GocognitSettings{
+		MinComplexity: 30,
+	},
+	WSL: WSLSettings{
+		StrictAppend:                     true,
+		AllowAssignAndCallCuddle:         true,
+		AllowMultiLineAssignCuddle:       true,
+		AllowCuddleDeclaration:           false,
+		AllowTrailingComment:             false,
+		CaseForceTrailingWhitespaceLimit: 0,
+	},
+}
+
+type CustomLinterSettings struct {
+	Path        string
+	Description string
+	OriginalURL string `mapstructure:"original-url"`
 }
 
 type Linters struct {
@@ -318,7 +364,8 @@ func (e ExcludeRule) Validate() error {
 	if e.Source != "" {
 		nonBlank++
 	}
-	if nonBlank < 2 {
+	const minConditionsCount = 2
+	if nonBlank < minConditionsCount {
 		return errors.New("at least 2 of (text, source, path, linters) should be set")
 	}
 	return nil
@@ -339,7 +386,7 @@ type Issues struct {
 	NeedFix bool `mapstructure:"fix"`
 }
 
-type Config struct { //nolint:maligned
+type Config struct {
 	Run Run
 
 	Output struct {
@@ -347,6 +394,7 @@ type Config struct { //nolint:maligned
 		Color               string
 		PrintIssuedLine     bool `mapstructure:"print-issued-lines"`
 		PrintLinterName     bool `mapstructure:"print-linter-name"`
+		UniqByLine          bool `mapstructure:"uniq-by-line"`
 		PrintWelcomeMessage bool `mapstructure:"print-welcome"`
 	}
 
