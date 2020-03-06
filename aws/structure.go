@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/aws/aws-sdk-go/service/quicksight"
 	"reflect"
 	"regexp"
 	"sort"
@@ -2094,6 +2095,9 @@ func getStringPtr(m interface{}, key string) *string {
 			s := v.(string)
 			return &s
 		}
+
+	default:
+		panic("unknown type in getStringPtr")
 	}
 
 	return nil
@@ -2110,6 +2114,56 @@ func (s setMap) SetString(key string, value *string) {
 	}
 
 	s[key] = *value
+}
+
+// SetStringMap sets key to value as a map[string]interface{}, stripping any nil
+// values. The value parameter can be a map[string]interface{}, a
+// map[string]*string, or a map[string]string.
+func (s setMap) SetStringMap(key string, value interface{}) {
+	// because these methods are meant to be chained without intermediate
+	// checks for nil, we are likely to get interfaces with dynamic types but
+	// a nil value.
+	if reflect.ValueOf(value).IsNil() {
+		return
+	}
+
+	m := make(map[string]interface{})
+
+	switch value := value.(type) {
+	case map[string]string:
+		for k, v := range value {
+			m[k] = v
+		}
+	case map[string]*string:
+		for k, v := range value {
+			if v == nil {
+				continue
+			}
+			m[k] = *v
+		}
+	case map[string]interface{}:
+		for k, v := range value {
+			if v == nil {
+				continue
+			}
+
+			switch v := v.(type) {
+			case string:
+				m[k] = v
+			case *string:
+				if v != nil {
+					m[k] = *v
+				}
+			default:
+				panic(fmt.Sprintf("unknown type for SetString: %T", v))
+			}
+		}
+	}
+
+	// catch the case where the interface wasn't nil, but we had no non-nil values
+	if len(m) > 0 {
+		s[key] = m
+	}
 }
 
 // Set assigns value to s[key] if value isn't nil
@@ -3911,6 +3965,120 @@ func flattenCognitoIdentityPoolRolesAttachmentMappingRules(d []*cognitoidentity.
 	}
 
 	return rules
+}
+
+func diffQuickSightPermissionsToGrantAndRevoke(oldPerms []interface{}, newPerms []interface{}) ([]*quicksight.ResourcePermission, []*quicksight.ResourcePermission) {
+	grants := diffQuickSightPermissionsLookup(oldPerms, newPerms)
+
+	toGrant := make([]*quicksight.ResourcePermission, 0)
+	toRevoke := make([]*quicksight.ResourcePermission, 0)
+
+	for principal, actions := range grants {
+		grant := &quicksight.ResourcePermission{
+			Principal: aws.String(principal),
+			Actions:   make([]*string, 0),
+		}
+		revoke := &quicksight.ResourcePermission{
+			Principal: aws.String(principal),
+			Actions:   make([]*string, 0),
+		}
+
+		for action, shouldGrant := range actions {
+			if shouldGrant {
+				grant.Actions = append(grant.Actions, aws.String(action))
+			} else {
+				revoke.Actions = append(revoke.Actions, aws.String(action))
+			}
+		}
+
+		if len(grant.Actions) > 0 {
+			toGrant = append(toGrant, grant)
+		}
+
+		if len(revoke.Actions) > 0 {
+			toRevoke = append(toRevoke, revoke)
+		}
+	}
+
+	return toGrant, toRevoke
+}
+
+func diffQuickSightPermissionsLookup(oldPerms []interface{}, newPerms []interface{}) map[string]map[string]bool {
+	// Map principal to permissions. `true` means grant, `false` means
+	// revoke and absence means leave alone (i.e. unchanged)
+	grants := make(map[string]map[string]bool)
+
+	// All new params should be granted until further notice...
+	for _, v := range newPerms {
+		s := v.(map[string]interface{})
+
+		if p, ok := s["principal"].(string); ok {
+			if _, present := grants[p]; !present {
+				grants[p] = make(map[string]bool)
+			}
+
+			for _, v := range s["actions"].(*schema.Set).List() {
+				grants[p][v.(string)] = true
+			}
+		}
+	}
+
+	// Don't touch principal-action combos that are unchanged, revoke combos that
+	// are in old but not new
+	for _, v := range oldPerms {
+		s := v.(map[string]interface{})
+
+		if p, ok := s["principal"].(string); ok {
+			if principalGrants, present := grants[p]; present {
+				for _, v := range s["actions"].(*schema.Set).List() {
+					action := v.(string)
+
+					if _, present := principalGrants[action]; !present {
+						// In old but not in new so revoke
+						grants[p][action] = false
+					} else {
+						// In old and in new so leave alone
+						delete(grants[p], action)
+					}
+				}
+			} else {
+				grants[p] = make(map[string]bool)
+
+				// The principal is not desired in new
+				// permissions so revoke all
+				for _, v := range s["actions"].(*schema.Set).List() {
+					grants[p][v.(string)] = false
+				}
+			}
+
+		}
+	}
+
+	return grants
+}
+
+func flattenQuickSightPermissions(perms []*quicksight.ResourcePermission) []map[string]interface{} {
+	values := make([]map[string]interface{}, 0)
+
+	for _, v := range perms {
+		perm := make(map[string]interface{})
+
+		if v == nil {
+			return nil
+		}
+
+		if v.Principal != nil {
+			perm["principal"] = *v.Principal
+		}
+
+		if v.Actions != nil {
+			perm["actions"] = flattenStringList(v.Actions)
+		}
+
+		values = append(values, perm)
+	}
+
+	return values
 }
 
 func flattenRedshiftLogging(ls *redshift.LoggingStatus) []interface{} {

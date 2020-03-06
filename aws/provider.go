@@ -681,6 +681,7 @@ func Provider() terraform.ResourceProvider {
 			"aws_qldb_ledger":                                         resourceAwsQLDBLedger(),
 			"aws_quicksight_group":                                    resourceAwsQuickSightGroup(),
 			"aws_quicksight_user":                                     resourceAwsQuickSightUser(),
+			"aws_quicksight_data_source":                              resourceAwsQuickSightDataSource(),
 			"aws_ram_principal_association":                           resourceAwsRamPrincipalAssociation(),
 			"aws_ram_resource_association":                            resourceAwsRamResourceAssociation(),
 			"aws_ram_resource_share":                                  resourceAwsRamResourceShare(),
